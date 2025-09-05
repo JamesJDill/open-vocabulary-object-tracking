@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+# Build artifacts
+build/
+dist/
+# VSCode / PyCharm
+.vscode/
+.idea/
+# OS
+.DS_Store
