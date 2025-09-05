@@ -1,3 +1,6 @@
 [submodule "external/GroundingDINO"]
 	path = external/GroundingDINO
 	url = git@github.com:IDEA-Research/GroundingDino.git
+[submodule "external/YOLO-World"]
+	path = external/YOLO-World
+	url = https://github.com/AILab-CVC/YOLO-World.git
