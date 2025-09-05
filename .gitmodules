@@ -1,0 +1,3 @@
+[submodule "external/GroundingDINO"]
+	path = external/GroundingDINO
+	url = git@github.com:IDEA-Research/GroundingDino.git
