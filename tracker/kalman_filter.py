@@ -1,11 +1,5 @@
 import numpy as np
 
-"""
-Table for the 0.95 quantile of the chi-square distribution with N degrees of
-freedom (contains values for N=1, ..., 9). Taken from MATLAB/Octave's chi2inv
-function and used as Mahalanobis gating threshold.
-"""
-
 class KalmanFilter(object):
     """
     A Kalman filter for tracking bounding boxes
