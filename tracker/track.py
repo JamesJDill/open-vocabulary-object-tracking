@@ -30,6 +30,7 @@ class Track(object):
     def __init__(
         self, 
         track_id: int, 
+        label: int,
         mean: np.ndarray, 
         covariance: np.ndarray,
         init_frame: int,
@@ -43,6 +44,8 @@ class Track(object):
         Args:
             track_id : int
                 the unique track identifier assigned to this track
+            label : int
+                the label of the track
             mean : (8,) ndarray
                 Initial state mean [x, y, w, h, vx, vy, vw, vh]
             covariance : (8,8) ndarray
@@ -155,6 +158,9 @@ class Track(object):
     @property
     def is_dead(self):     return self.state in (TrackState.EXITED, TrackState.TERMINATED)
 
+    @property
+    def label(self):       return self.label
+    
     @property
     def tlwh(self): return np.array([self.x - self.w/2, self.y - self.h/2, self.w, self.h], dtype=np.float32)
     
