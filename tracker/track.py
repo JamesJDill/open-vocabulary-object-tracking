@@ -59,6 +59,7 @@ class Track(object):
         """
         
         self.track_id = track_id
+        self.label = label
         self.state = TrackState.NEW
         self.mean = mean
         self.covariance = covariance
