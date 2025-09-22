@@ -173,7 +173,7 @@ class KalmanFilter(object):
 
     def gating_distance(self, x_pred, P_pred, z, only_position=False):
         """
-        Compute gating distance between state distribution and cuurrent frame bounding boxes.
+        Compute gating distance between state distribution and current frame bounding boxes.
         If only_position is true then use dof=2, else dof=4.
 
         Args
@@ -181,13 +181,13 @@ class KalmanFilter(object):
                 Predicted state mean after advancing one frame by the motion model F: x_pred = F @ x
             P_pred : (8,8) ndarray
                 Predicted covariance propagated through the dynamics and inflated by: P_pred = F @ P @ F.T + Q
-            z : (N,4) ndarray
+            z : (M,4) ndarray
                 bounding box coordinates [x, y, w, h] with center positions (x, y) and width w, height h
             only_position
                 Determines whether to use 2 dof or 4 dof for chi square distribution. Defaults to False.
         
         Returns
-            distances : (N,) squared mahalanobis distances between (x_pred, P_pred) and measurements z
+            distances : (M,) squared mahalanobis distances between (x_pred, P_pred) and measurements z
         """
         z_pred, S = self.project(x_pred, P_pred)
         
