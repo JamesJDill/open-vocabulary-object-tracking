@@ -2,11 +2,9 @@ import numpy as np
 from enum import IntEnum
 
 class TrackState(IntEnum):
-    NEW     = 0
     ACTIVE  = 1
     MISSING = 2
-    EXITED = 3
-    TERMINATED = 4
+    TERMINATED = 3
 
 X, Y, W, H, VX, VY, VW, VH = range(8)
 
@@ -57,7 +55,7 @@ class Track(object):
         self.track_id = track_id
         self.label = label
         self.app_vector = init_scores
-        self.state = TrackState.NEW
+        self.state = TrackState.ACTIVE
         self.mean = mean
         self.covariance = covariance
         self.frames_missing = 0 # increments if self.state == TrackState.MISSING
@@ -103,16 +101,8 @@ class Track(object):
         self.covariance = new_cov
         self.state = new_state
         
-        
         if new_scores is not None:
             self.update_app_vector(new_scores)
-
-        if self.state == TrackState.MISSING:
-            self.frames_missing += 1
-            if self.frames_missing >= self.missing_limit:
-                self.state = TrackState.TERMINATED
-        elif self.state not in [TrackState.TERMINATED, TrackState.EXITED]:
-            self.frames_missing = 0
             
     
     # For extracting values from the track state mean
