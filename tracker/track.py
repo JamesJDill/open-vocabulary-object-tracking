@@ -136,15 +136,6 @@ class Track(object):
     
     @property
     def area(self):   return float(self.w * self.h)
-        
-    @property
-    def is_active(self):   return self.state is TrackState.ACTIVE
-    
-    @property
-    def is_missing(self):  return self.state is TrackState.MISSING
-    
-    @property
-    def is_dead(self):     return self.state in (TrackState.EXITED, TrackState.TERMINATED)
     
     @property
     def score_vector(self): return self.app_vector

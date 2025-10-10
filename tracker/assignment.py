@@ -124,5 +124,5 @@ def linear_assignment(cost_matrix, thresh):
             matches.append([ix, mx])
     unmatched_tracks = np.where(x < 0)[0]
     unmatched_dets = np.where(y < 0)[0]
-    matches = np.asarray(matches)
+    matches = np.asarray(matches, dtype=int).reshape(-1, 2)
     return matches, unmatched_tracks, unmatched_dets

@@ -110,6 +110,9 @@ class Tracker(object):
                     track.frames_missing += 1    
                     new_state = TrackState.TERMINATED if track.frames_missing >= track.missing_limit else TrackState.MISSING
                     track.update(new_mean, new_covariance, new_state, new_scores=None)
+                
+                # Purge Terminated Tracks
+                self.curr_tracks = [t for t in self.curr_tracks if t.state != TrackState.TERMINATED]  
             return
         
         L = scores.shape[1]
@@ -181,3 +184,28 @@ class Tracker(object):
         
         # ---------- Post matching assignment ----------
         
+        # 1. Update Matched Tracks
+        for track_idx, det_idx in matches:
+            track = self.curr_tracks[track_idx]
+            new_mean, new_cov = self.kalman_filter.update(track.mean, track.covariance, boxes[det_idx])
+            track.frames_missing = 0
+            track.update(new_mean, new_cov, new_state=TrackState.ACTIVE, new_scores=scores[det_idx])
+            
+        # 2. Update Unmatched Tracks
+        for track_idx in unmatched_tracks:
+            track = self.curr_tracks[track_idx]
+            track.frames_missing += 1
+            new_state = TrackState.TERMINATED if track.frames_missing >= track.missing_limit else TrackState.MISSING
+            track.update(track.mean, track.covariance, new_state, new_scores=None)
+            
+        # 3. Spawn new tracks from unmatched detections which pass det threshold
+        for det_idx in unmatched_dets:
+            if best_scores[det_idx] >= self.score_thresh[labels[det_idx]]:
+                init_mean, init_cov = self.kalman_filter.initialize(boxes[det_idx])
+                new_track = Track(self.curr_track, labels[det_idx], scores[det_idx], init_mean, init_cov)
+                
+                self.curr_tracks.append(new_track)
+                self.curr_track += 1
+                
+        # 4. Purge Terminated Tracks
+        self.curr_tracks = [t for t in self.curr_tracks if t.state != TrackState.TERMINATED]
