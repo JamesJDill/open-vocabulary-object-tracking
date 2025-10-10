@@ -77,11 +77,11 @@ def cdist_vectorized(tracks: np.ndarray, detections: np.ndarray):
     
     return c2 / span2
     
-def cost_matrix(tracks: np.ndarray, detections: np.ndarray, alpha=0.7, gamma=1.5):
+def dist_cost_matrix(tracks: np.ndarray, detections: np.ndarray, alpha=0.7, gamma=1.5):
     """
     Computes the DIoU-based cost matrix between Tracks and detections
     
-    returns: (N,M) Cost matrix
+    returns: (N, M) Cost matrix
     """
     N, M = tracks.shape[0], detections.shape[0]
     ones = np.ones((N,M))
@@ -92,9 +92,31 @@ def cost_matrix(tracks: np.ndarray, detections: np.ndarray, alpha=0.7, gamma=1.5
     
     return ((ones - iou) + (alpha * w * cdist)) / (1 + alpha)
 
+def app_cost_matrix(track_scores: np.ndarray, det_scores: np.ndarray):
+    """_summary_
+    Returns a cost matrix just using the scores assigned to each potential label
+    
+    Args:
+        L = num labels; N = num tracks; M = num dets
+        track_scores (N, L)
+        det_scores (M, L)
+    
+    returns: (N, M) Cost matrix
+    """
+    track_norms = np.linalg.norm(track_scores, axis=1, keepdims=True)
+    det_norms   = np.linalg.norm(det_scores,   axis=1, keepdims=True)
+    
+    track_unit = np.divide(track_scores, np.maximum(track_norms, 1e-6))
+    det_unit   = np.divide(det_scores,   np.maximum(det_norms,   1e-6))
+    
+    sim = track_unit @ det_unit.T
+    cost = 0.5 * (1.0 - sim)
+    return cost
+    
+    
 def linear_assignment(cost_matrix, thresh):
     if cost_matrix.size == 0:
-        return np.empty((0, 2), dtype=int), tuple(range(cost_matrix.shape[0])), tuple(range(cost_matrix.shape[1]))
+        return np.empty((0, 2), dtype=int), np.arange(cost_matrix.shape[0]), np.arange(cost_matrix.shape[1])
     matches, unmatched_tracks, unmatched_dets = [], [], []
     cost, x, y = lap.lapjv(cost_matrix, extend_cost=True, cost_limit=thresh)
     for ix, mx in enumerate(x):
