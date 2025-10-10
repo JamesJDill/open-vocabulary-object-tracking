@@ -66,7 +66,22 @@ class Tracker(object):
                 self.score_thresh[label] = new_thresh
             
             self.score_thresh[label] = 0.9 * self.score_thresh[label] + 0.1 * new_thresh
-        
+    
+    def _xywh_to_xyxy(self, boxes_xywh: np.ndarray) -> np.ndarray:
+        # boxes are center-based [x, y, w, h]
+        x, y, w, h = boxes_xywh[:,0], boxes_xywh[:,1], boxes_xywh[:,2], boxes_xywh[:,3]
+        x1 = x - w / 2.0
+        y1 = y - h / 2.0
+        x2 = x1 + w
+        y2 = y1 + h
+        return np.stack([x1, y1, x2, y2], axis=1)
+
+    def extract_track_boxes(self):
+        if len(self.curr_tracks) == 0:
+            return np.empty((0,4), dtype=np.float64)
+        arr = np.array([[t.x, t.y, t.w, t.h] for t in self.curr_tracks], dtype=np.float64)
+        return self._xywh_to_xyxy(arr)
+    
     def update(
         self, 
         boxes: np.ndarray, 
@@ -81,12 +96,20 @@ class Tracker(object):
             scores : (M,L) np.ndarray
                 the current frame scores
         """
+        self.curr_frame += 1
+        
         N = len(self.curr_tracks)   # Num Tracks
         M = len(boxes)              # Num Dets
         
-        # if there are no dets for the current frame we end early
+        # If we have no current dets to spawn as tracks
         if M == 0:
-            self.curr_frame += 1
+            # If we have current tracks to update
+            if N > 0:
+                for track in self.curr_tracks:
+                    new_mean, new_covariance = self.kalman_filter.predict(track.mean, track.covariance)
+                    track.frames_missing += 1    
+                    new_state = TrackState.TERMINATED if track.frames_missing >= track.missing_limit else TrackState.MISSING
+                    track.update(new_mean, new_covariance, new_state, new_scores=None)
             return
         
         L = scores.shape[1]
@@ -96,6 +119,26 @@ class Tracker(object):
         
         # Update the dynamic threshold for all labels based on current detection scores
         self.update_score_thresh(best_scores, labels)
+        
+        # If we have no current tracks to update
+        if N == 0:
+            # If we have dets we can spawn them as tracks
+            if M > 0:
+                for i in range(M):
+                    if best_scores[i] >= self.score_thresh[labels[i]]:
+                        init_scores = scores[i]
+                        init_mean, init_cov = self.kalman_filter.initialize(boxes[i])
+                        
+                        new_track = Track(
+                            self.curr_track, 
+                            labels[i], 
+                            init_scores, 
+                            init_mean, 
+                            init_cov
+                        )
+                        self.curr_tracks.append(new_track)
+                        self.curr_track += 1
+            return
         
         # Process current tracks for matching
         for track in self.curr_tracks:
@@ -108,21 +151,23 @@ class Tracker(object):
         gating_distances = np.vstack(gating_distances)  # (N, M) gating distances^2
         
         # Compute the DIoU-based cost
-        costs = dist_cost_matrix(self.curr_tracks, boxes)
+        track_boxes = self.extract_track_boxes()
+        det_boxes = self._xywh_to_xyxy(boxes)
+        costs = dist_cost_matrix(track_boxes, det_boxes)
         
         # Construct masks for cost matrix
         gating_mask = gating_distances > CHI2_INV95[4]
         score_thresholds = np.array([self.score_thresh[l] for l in labels])
         det_mask = best_scores >= score_thresholds
         
-        # 1st Pass
+        # ---------- First pass ----------
         first_pass_costs = costs.copy()
         first_pass_costs[gating_mask] = BIG_NUM
         first_pass_costs[:, ~det_mask] = BIG_NUM
         
         high_matches, unmatched_tracks, unmatched_dets = linear_assignment(first_pass_costs, thresh=0.7)
         
-        # 2nd Pass
+        # ---------- Second pass ----------
         if len(high_matches) > 0:
             matched_tracks = high_matches[:, 0]
             matched_dets   = high_matches[:, 1]
@@ -133,3 +178,6 @@ class Tracker(object):
         
         low_matches, unmatched_tracks, unmatched_dets = linear_assignment(costs, thresh=0.7)
         matches = np.vstack([high_matches, low_matches])
+        
+        # ---------- Post matching assignment ----------
+        
