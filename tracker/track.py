@@ -17,26 +17,24 @@ class Track(object):
     
     __slots__ = (
         "track_id", 
+        "label",
+        "app_vector",
         "state", 
-        "mean", 
+        "mean",
         "covariance", 
-        "frames_missing", 
+        "frames_missing",
         "missing_limit",
-        "first_frame", 
-        "state_history",
         "__weakref__"
     )
     
     def __init__(
         self, 
         track_id: int, 
-        label_vector: np.ndarray,
         label: int,
+        init_scores: np.ndarray,
         mean: np.ndarray, 
         covariance: np.ndarray,
-        init_frame: int,
-        missing_limit: int=30,
-        store_states: bool=False
+        missing_limit: int=30
     ):
         """
         Initializes a new track. 
@@ -47,47 +45,44 @@ class Track(object):
                 the unique track identifier assigned to this track
             label : int
                 the label of the track
+            init_scores : (L) ndarray
+                initial scores for each label of the current track
             mean : (8,) ndarray
                 Initial state mean [x, y, w, h, vx, vy, vw, vh]
             covariance : (8,8) ndarray
                 Initial state covariance
-            init_frame : int
-                the initial frame of the track, needed for determining track age
             missing_limit : int = 30
                 the number of frames a track can be missing before it is removed
-            store_states : bool
-                whether to store the track states over time
         """
-        
         self.track_id = track_id
         self.label = label
+        self.app_vector = init_scores
         self.state = TrackState.NEW
         self.mean = mean
         self.covariance = covariance
         self.frames_missing = 0 # increments if self.state == TrackState.MISSING
         self.missing_limit = missing_limit
-        
-        self.first_frame = init_frame
-        self.state_history = None
-        if store_states:
-            self.state_history = []
-    
-    
-    def as_dict(self):
-        return {
-            "id": self.track_id,
-            "state": int(self.state),
-            "mean": self.mean.tolist(),
-            "frames_missing": self.frames_missing,
-            "first_frame": self.first_frame,
-        }
+
+    def update_app_vector(
+        self, 
+        new_scores: np.ndarray
+    ):
+        """
+        EMA update of the appearance vector
+
+        Args:
+            new_scores (L,): ndarray, latest per-label scores for this track
+        """
+        alpha = 2.0 / (self.missing_limit + 1.0)
+        self.app_vector = (1.0 - alpha) * self.app_vector + alpha * new_scores.flatten()
 
 
     def update(
         self,
         new_mean: np.ndarray, 
         new_cov: np.ndarray,
-        new_state: TrackState=None,
+        new_state: TrackState,
+        new_scores: np.ndarray = None,
     ):
         """
         Updates the track with a new mean, covariance, and state. 
@@ -99,24 +94,25 @@ class Track(object):
             new_cov : (8,8) ndarray
                 new state covariance
             new_state : TrackState
-                New track state
+                new track state for the track
+            new_scores: (L,) ndarray
+                new scores for the matched track
         """  
         
         self.mean = new_mean
         self.covariance = new_cov
+        self.state = new_state
         
-        if new_state is not None:
-            self.state = new_state
+        
+        if new_scores is not None:
+            self.update_app_vector(new_scores)
 
-        if self.state is TrackState.MISSING:
+        if self.state == TrackState.MISSING:
             self.frames_missing += 1
             if self.frames_missing >= self.missing_limit:
                 self.state = TrackState.TERMINATED
         elif self.state not in [TrackState.TERMINATED, TrackState.EXITED]:
             self.frames_missing = 0
-            
-        if self.state_history is not None:
-            self.state_history.append(int(self.state))
             
     
     # For extracting values from the track state mean
@@ -159,9 +155,9 @@ class Track(object):
     
     @property
     def is_dead(self):     return self.state in (TrackState.EXITED, TrackState.TERMINATED)
-
+    
     @property
-    def label(self):       return self.label
+    def score_vector(self): return self.app_vector
     
     @property
     def tlwh(self): return np.array([self.x - self.w/2, self.y - self.h/2, self.w, self.h], dtype=np.float32)
@@ -170,8 +166,3 @@ class Track(object):
     def tlbr(self): 
         tl = self.tlwh
         return np.array([tl[0], tl[1], tl[0]+tl[2], tl[1]+tl[3]], dtype=np.float32)
-
-    def __repr__(self):
-        return (f"Track(id={self.track_id}, state={self.state.name}, "
-            f"xywh=({self.x:.1f},{self.y:.1f},{self.w:.1f},{self.h:.1f}), "
-            f"miss={self.frames_missing}/{self.missing_limit})")
