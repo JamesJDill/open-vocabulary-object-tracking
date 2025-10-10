@@ -30,6 +30,7 @@ class Track(object):
     def __init__(
         self, 
         track_id: int, 
+        label_vector: np.ndarray,
         label: int,
         mean: np.ndarray, 
         covariance: np.ndarray,
