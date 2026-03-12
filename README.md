@@ -2,6 +2,38 @@
 
 A lightweight open-vocabulary multi-object tracker built on top of GroundingDINO detections. This project takes phrase-conditioned detections from GroundingDINO and links them over time using a Kalman-filter-based tracker with adaptive label-aware confidence thresholding, class-wise NMS, and a combined geometric-plus-appearance assignment cost to enable SORT-based tracking in the Open-Vocabulary scenarios. The result is a tracker that can follow both standard tracking prompts and unconventional prompts while preserving per-track identities across video frames.
 
+## Demo
+
+<table>
+  <tr>
+    <td align="center">
+      <b>Example result 1</b><br/>
+      <video src="assets/demo2_person.mp4" controls muted width="100%"></video><br/>
+      <sub><code>assets/demo2_person.mp4</code></sub>
+    </td>
+    <td align="center">
+      <b>Example result 2</b><br/>
+      <video src="assets/demo2_body.mp4" controls muted width="100%"></video><br/>
+      <sub><code>assets/demo2_body.mp4</code></sub>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center">
+      <b>Example result 1</b><br/>
+      <video src="assets/demo1_person.mp4" controls muted width="100%"></video><br/>
+      <sub><code>assets/demo1_person.mp4</code></sub>
+    </td>
+    <td align="center">
+      <b>Example result 2</b><br/>
+      <video src="demo/demo1_body.mp4" controls muted width="100%"></video><br/>
+      <sub><code>demo/demo1_body.mp4</code></sub>
+    </td>
+  </tr>
+</table>
+
 ## Abstract
 
 This repository implements an open-vocabulary tracking pipeline that decouples detection from association. GroundingDINO provides phrase-conditioned detections, while the core tracker abstraction performs temporal association using (1) a Kalman filter for motion prediction, (2) ByteTrack-style track associations, (3) adaptive per-label score thresholds computed from current-frame detections, (4) class-wise non-maximum suppression, and (5) a weighted assignment cost that blends geometry-based distance cost with score-vector appearance similarity. Each track also maintains an exponentially smoothed label-score appearance vector over time, enabling more stable matching when detector scores fluctuate frame to frame.
