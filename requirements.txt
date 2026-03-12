@@ -1,0 +1,16 @@
+numpy
+opencv-python
+pillow
+matplotlib
+tqdm
+jupyter
+ipykernel
+
+lap
+
+transformers<5
+addict
+yapf
+timm
+supervision>=0.22.0
+pycocotools
