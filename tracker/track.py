@@ -32,7 +32,7 @@ class Track(object):
         init_scores: np.ndarray,
         mean: np.ndarray, 
         covariance: np.ndarray,
-        missing_limit: int=30
+        missing_limit: int=5
     ):
         """
         Initializes a new track. 
