@@ -119,8 +119,8 @@ source ~/.bashrc
 ### 2. Repo + Environment Set-up
 
 ```bash
-git clone --recurse-submodules https://github.com/JamesJDill/open-vocabulary-object-tracking.git
-cd open-vocabulary-object-tracking
+git clone --recurse-submodules https://github.com/JamesJDill/GroundedTrack.git
+cd GroundedTrack
 
 conda create -n ovtrack python=3.10 -y
 conda activate ovtrack
