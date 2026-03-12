@@ -8,13 +8,13 @@ A lightweight open-vocabulary multi-object tracker built on top of GroundingDINO
   <tr>
     <td align="center">
       <b>Example result 1</b><br/>
-      <video src="assets/demo2_person.mp4" controls muted width="100%"></video><br/>
-      <sub><code>assets/demo2_person.mp4</code></sub>
+      <video src="assets/demo2_person.gif" controls muted width="100%"></video><br/>
+      <sub><code>assets/demo2_person.gif</code></sub>
     </td>
     <td align="center">
       <b>Example result 2</b><br/>
-      <video src="assets/demo2_body.mp4" controls muted width="100%"></video><br/>
-      <sub><code>assets/demo2_body.mp4</code></sub>
+      <video src="assets/demo2_body.gif" controls muted width="100%"></video><br/>
+      <sub><code>assets/demo2_body.gif</code></sub>
     </td>
   </tr>
 </table>
@@ -23,13 +23,13 @@ A lightweight open-vocabulary multi-object tracker built on top of GroundingDINO
   <tr>
     <td align="center">
       <b>Example result 1</b><br/>
-      <video src="assets/demo1_person.mp4" controls muted width="100%"></video><br/>
-      <sub><code>assets/demo1_person.mp4</code></sub>
+      <video src="assets/demo1_person.gif" controls muted width="100%"></video><br/>
+      <sub><code>assets/demo1_person.gif</code></sub>
     </td>
     <td align="center">
       <b>Example result 2</b><br/>
-      <video src="demo/demo1_body.mp4" controls muted width="100%"></video><br/>
-      <sub><code>demo/demo1_body.mp4</code></sub>
+      <video src="demo/demo1_body.gif" controls muted width="100%"></video><br/>
+      <sub><code>demo/demo1_body.gif</code></sub>
     </td>
   </tr>
 </table>
