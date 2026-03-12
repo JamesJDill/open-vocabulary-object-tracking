@@ -1,4 +1,4 @@
-# Open-Vocabulary Object Tracking
+# Grounded Multi-Object Tracking with GroundingDINO
 
 A lightweight open-vocabulary multi-object tracker built on top of GroundingDINO detections. This project takes phrase-conditioned detections from GroundingDINO and links them over time using a Kalman-filter-based tracker with adaptive label-aware confidence thresholding, class-wise NMS, and a combined geometric-plus-appearance assignment cost to enable SORT-based tracking in the Open-Vocabulary scenarios. The result is a tracker that can follow both standard tracking prompts and unconventional prompts while preserving per-track identities across video frames.
 
