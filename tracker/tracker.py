@@ -1,8 +1,8 @@
 import numpy as np
 
-from kalman_filter import KalmanFilter
-from track import Track, TrackState
-from assignment import dist_cost_matrix, app_cost_matrix, linear_assignment
+from .kalman_filter import KalmanFilter
+from .track import Track, TrackState
+from .assignment import dist_cost_matrix, app_cost_matrix, linear_assignment, iou_one_to_many
 
 from collections import defaultdict
 
@@ -58,14 +58,14 @@ class Tracker(object):
             if len(filt_scores) == 0:
                 continue
             
-            new_thresh = np.max(np.abs(np.sort(filt_scores))) - 0.01
+            new_thresh = max(0.01, np.mean(filt_scores) - 0.01)
             if len(filt_scores) == 1:
                 new_thresh = max(0.01, filt_scores[0] - 0.01)
             
             if self.score_thresh[label] == 0.01:
                 self.score_thresh[label] = new_thresh
             
-            self.score_thresh[label] = 0.9 * self.score_thresh[label] + 0.1 * new_thresh
+            self.score_thresh[label] = 0.8 * self.score_thresh[label] + 0.2 * new_thresh
     
     def _xywh_to_xyxy(self, boxes_xywh: np.ndarray) -> np.ndarray:
         # boxes are center-based [x, y, w, h]
@@ -76,6 +76,63 @@ class Tracker(object):
         y2 = y1 + h
         return np.stack([x1, y1, x2, y2], axis=1)
 
+    def _classwise_nms(
+            self,
+            boxes_xywh: np.ndarray,
+            scores: np.ndarray,
+            labels: np.ndarray,
+            best_scores: np.ndarray,
+            iou_thresh: float = 0.5,
+        ):
+        """
+        Apply NMS only among detections that share the same argmax label.
+
+        Args:
+            boxes_xywh: (M,4) center-based boxes
+            scores: (M,L) full score vectors
+            labels: (M,) argmax label per detection
+            best_scores: (M,) best score per detection
+            iou_thresh: suppress same-label boxes with IoU > this threshold
+
+        Returns:
+            filtered_boxes_xywh, filtered_scores, filtered_labels, filtered_best_scores
+        """
+        if len(boxes_xywh) == 0:
+            return boxes_xywh, scores, labels, best_scores
+
+        boxes_xyxy = self._xywh_to_xyxy(boxes_xywh)
+        keep_indices = []
+
+        for label in np.unique(labels):
+            cls_idx = np.where(labels == label)[0]
+            cls_boxes = boxes_xyxy[cls_idx]
+            cls_best = best_scores[cls_idx]
+
+            order = np.argsort(-cls_best)
+            cls_keep = []
+
+            while len(order) > 0:
+                i = order[0]
+                cls_keep.append(cls_idx[i])
+
+                if len(order) == 1:
+                    break
+
+                ious = iou_one_to_many(cls_boxes[i], cls_boxes[order[1:]])
+                remaining = np.where(ious <= iou_thresh)[0]
+                order = order[remaining + 1]
+
+            keep_indices.extend(cls_keep)
+
+        keep_indices = np.array(sorted(keep_indices), dtype=int)
+        
+        return (
+            boxes_xywh[keep_indices],
+            scores[keep_indices],
+            labels[keep_indices],
+            best_scores[keep_indices],
+        )
+    
     def extract_track_boxes(self):
         if len(self.curr_tracks) == 0:
             return np.empty((0,4), dtype=np.float64)
@@ -98,6 +155,18 @@ class Tracker(object):
         """
         self.curr_frame += 1
         
+        best_scores = np.max(scores, axis=1)    # (M,)
+        labels      = np.argmax(scores, axis=1) # (M,)
+        
+        # Apply NMS only within the same predicted label
+        boxes, scores, labels, best_scores = self._classwise_nms(
+            boxes_xywh=boxes,
+            scores=scores,
+            labels=labels,
+            best_scores=best_scores,
+            iou_thresh=0.5,
+        )
+        
         N = len(self.curr_tracks)   # Num Tracks
         M = len(boxes)              # Num Dets
         
@@ -114,11 +183,6 @@ class Tracker(object):
                 # Purge Terminated Tracks
                 self.curr_tracks = [t for t in self.curr_tracks if t.state != TrackState.TERMINATED]  
             return
-        
-        L = scores.shape[1]
-        
-        best_scores = np.max(scores, axis=1)    # (M,)
-        labels      = np.argmax(scores, axis=1) # (M,)
         
         # Update the dynamic threshold for all labels based on current detection scores
         self.update_score_thresh(best_scores, labels)
@@ -150,13 +214,21 @@ class Tracker(object):
         # Compute the gating distances
         gating_distances = []
         for track in self.curr_tracks:
-            gating_distances.append(self.kalman_filter.gating_distance(track.mean, track.covariance, boxes))
+            gating_distances.append(
+                self.kalman_filter.gating_distance(track.mean, track.covariance, boxes)
+                )
         gating_distances = np.vstack(gating_distances)  # (N, M) gating distances^2
         
         # Compute the DIoU-based cost
         track_boxes = self.extract_track_boxes()
         det_boxes = self._xywh_to_xyxy(boxes)
-        costs = dist_cost_matrix(track_boxes, det_boxes)
+        dist_costs = dist_cost_matrix(track_boxes, det_boxes)
+        
+        # Compute Appearance-based cost
+        track_score_vectors = np.stack([t.score_vector for t in self.curr_tracks], axis=0)
+        score_costs = app_cost_matrix(track_score_vectors, scores)
+        
+        costs = 0.8 * dist_costs + 0.2 * score_costs
         
         # Construct masks for cost matrix
         gating_mask = gating_distances > CHI2_INV95[4]
@@ -171,16 +243,26 @@ class Tracker(object):
         high_matches, unmatched_tracks, unmatched_dets = linear_assignment(first_pass_costs, thresh=0.7)
         
         # ---------- Second pass ----------
-        if len(high_matches) > 0:
-            matched_tracks = high_matches[:, 0]
-            matched_dets   = high_matches[:, 1]
-            costs[matched_tracks, :] = BIG_NUM
-            costs[:, matched_dets]   = BIG_NUM
-            
-        costs[gating_mask] = BIG_NUM
-        
-        low_matches, unmatched_tracks, unmatched_dets = linear_assignment(costs, thresh=0.7)
-        matches = np.vstack([high_matches, low_matches])
+        low_matches = np.empty((0, 2), dtype=int)
+        if len(unmatched_tracks) > 0 and len(unmatched_dets) > 0:
+            second_costs = costs[np.ix_(unmatched_tracks, unmatched_dets)].copy()
+            second_gating = gating_mask[np.ix_(unmatched_tracks, unmatched_dets)]
+            second_costs[second_gating] = BIG_NUM
+
+            low_local_matches, second_unmatched_tracks, second_unmatched_dets = linear_assignment(
+                second_costs, thresh=0.7
+            )
+
+            if len(low_local_matches) > 0:
+                low_matches = np.column_stack([
+                    unmatched_tracks[low_local_matches[:, 0]],
+                    unmatched_dets[low_local_matches[:, 1]],
+                ])
+
+            unmatched_tracks = unmatched_tracks[second_unmatched_tracks]
+            unmatched_dets = unmatched_dets[second_unmatched_dets]
+
+        matches = np.vstack([high_matches, low_matches]) if len(low_matches) > 0 else high_matches
         
         # ---------- Post matching assignment ----------
         
