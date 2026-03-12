@@ -1,7 +1,7 @@
 import numpy as np
 import lap
 
-def iou(box1, box2):
+def iou(box1: np.ndarray, box2: np.ndarray):
     x1_min, y1_min, x1_max, y1_max = box1
     x2_min, y2_min, x2_max, y2_max = box2
     
@@ -24,6 +24,27 @@ def iou(box1, box2):
     
     return inter_area / union_area
 
+def iou_one_to_many(box: np.ndarray, boxes: np.ndarray) -> np.ndarray:
+    """
+    box: (4,) in xyxy
+    boxes: (N,4) in xyxy
+    returns: (N,) IoU
+    """
+    x1 = np.maximum(box[0], boxes[:, 0])
+    y1 = np.maximum(box[1], boxes[:, 1])
+    x2 = np.minimum(box[2], boxes[:, 2])
+    y2 = np.minimum(box[3], boxes[:, 3])
+
+    inter_w = np.maximum(0.0, x2 - x1)
+    inter_h = np.maximum(0.0, y2 - y1)
+    inter = inter_w * inter_h
+
+    area1 = max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+    area2 = np.maximum(0.0, boxes[:, 2] - boxes[:, 0]) * np.maximum(0.0, boxes[:, 3] - boxes[:, 1])
+
+    union = area1 + area2 - inter
+    union = np.maximum(union, 1e-6)
+    return inter / union
 
 def iou_vectorized(tracks: np.ndarray, detections: np.ndarray):
     """
@@ -71,9 +92,7 @@ def cdist_vectorized(tracks: np.ndarray, detections: np.ndarray):
     x_min, y_min = np.minimum(d_x1, t_x1), np.minimum(d_y1, t_y1)
     
     span2 = (x_max - x_min)**2 + (y_max - y_min)**2
-    
-    if span2 == 0:
-        return 0
+    span2 = np.maximum(span2, 1e-6)
     
     return c2 / span2
     
